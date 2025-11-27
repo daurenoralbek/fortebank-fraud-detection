@@ -31,12 +31,12 @@ except Exception as e:
     st.stop()
 
 def prepare_features(transaction_dict, amount_median=1000, amount_p75=3000):
-    """Transform raw transaction into features"""
+    """Transform raw transaction into 44 features (matches trained model)"""
     amount = transaction_dict.get('amount', 0)
     hour = transaction_dict.get('hour_of_day', 0)
     day_of_week = transaction_dict.get('day_of_week', 0)
     month = transaction_dict.get('month', 1)
-    
+
     monthly_os_changes = transaction_dict.get('monthly_os_changes', 0)
     monthly_phone_model_changes = transaction_dict.get('monthly_phone_model_changes', 0)
     logins_7d = transaction_dict.get('logins_7d', 0)
@@ -52,7 +52,7 @@ def prepare_features(transaction_dict, amount_median=1000, amount_p75=3000):
     recipient_frequency = transaction_dict.get('recipient_frequency', 1)
     client_tx_count_7d = transaction_dict.get('client_tx_count_7d', 0)
     client_tx_count_30d = transaction_dict.get('client_tx_count_30d', 0)
-    
+
     amount_log = np.log1p(max(amount, 0))
     is_weekend = 1 if day_of_week >= 5 else 0
     device_instability = (monthly_os_changes + monthly_phone_model_changes) / 2
@@ -64,7 +64,7 @@ def prepare_features(transaction_dict, amount_median=1000, amount_p75=3000):
     device_instability_x_amount = device_instability * (1 if amount > amount_median else 0)
     inactive_x_large_tx = is_inactive_user * (1 if amount > amount_p75 else 0)
     anomaly_timing = ((1 if (hour < 8 or hour >= 17) else 0) * session_interval_anomaly)
-    
+
     features = [
         amount_log, hour, is_weekend, recipient_frequency, client_tx_count_7d, client_tx_count_30d,
         device_instability, login_surge_ratio, is_inactive_user, session_interval_anomaly,
@@ -72,17 +72,28 @@ def prepare_features(transaction_dict, amount_median=1000, amount_p75=3000):
         logins_7d, logins_30d, freq_7d, freq_change_ratio, avg_interval_30d, std_interval_30d,
         burstiness, fano_factor, zscore_7d, device_instability_x_amount, inactive_x_large_tx, anomaly_timing
     ]
+
+    # CRITICAL: Match exactly with training data encoding
+    # DOW: 6 categories, drop first = 5 features
+    dow_encoded = [1 if day_of_week == i else 0 for i in range(2, 7)]
     
-    dow_encoded = [1 if day_of_week == i else 0 for i in range(1, 7)]
+    # Month: 12 categories, drop first = 11 features
     month_encoded = [1 if month == i else 0 for i in range(2, 12)]
-    amount_encoded = [1 if amount <= 500 else 0, 
-                     1 if 500 < amount <= 1500 else 0,
-                     1 if 1500 < amount <= 3000 else 0]
     
-    features.extend(dow_encoded)
-    features.extend(month_encoded)
-    features.extend(amount_encoded)
-    
+    # Amount: 4 categories, drop first = 3 features
+    if amount <= 500:
+        amount_encoded = [1, 0, 0]
+    elif amount <= 1500:
+        amount_encoded = [0, 1, 0]
+    elif amount <= 3000:
+        amount_encoded = [0, 0, 1]
+    else:
+        amount_encoded = [0, 0, 0]
+
+    features.extend(dow_encoded)      # 26 + 5 = 31
+    features.extend(month_encoded)    # 31 + 11 = 42
+    features.extend(amount_encoded)   # 42 + 2 = 44 ✅
+
     return np.array(features).reshape(1, -1)
 
 def predict_fraud(transaction_dict):
@@ -221,4 +232,3 @@ with tab3:
 with st.sidebar:
     st.markdown("### 📊 Model Info")
     st.info(f"Best Threshold: {best_threshold:.2f}")
-
