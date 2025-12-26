@@ -427,7 +427,7 @@ Permission is hereby granted to use this project for educational and research pu
 **Author**: Dauren Oralbek
 
 - **GitHub**: [@daurenoralbek](https://github.com/daurenoralbek)
-- **Institution**: South Kazakhstan University (SDU)
+- **Institution**: Suleyman Demirel University (SDU)
 - **Program**: Statistics & Data Science, 3rd Year
 
 ### Questions & Support
